@@ -10,7 +10,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "dsplay-scan-template": "./cli.js"
+    "dsplay-scan-template": "cli.js"
   },
   "files": [
     "core.js",
