@@ -14,6 +14,10 @@ export default function templateManifestPlugin(options = {}) {
 
   return {
     name: 'dsplay-template-manifest',
+    // only run during an actual production build - Vitest drives the same plugin
+    // pipeline in 'serve' mode and reports a placeholder build.outDir, which would
+    // otherwise make closeBundle() write the manifest into a bogus folder.
+    apply: 'build',
     configResolved(resolvedConfig) {
       config = resolvedConfig;
     },
