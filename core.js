@@ -32,8 +32,10 @@ const COLOR_NAME_HINT = /colou?r/i;
 function guessSubtype(key, type) {
   if (type !== 'string') return undefined;
   if (VIDEO_NAME_HINT.test(key)) return 'video';
-  if (IMAGE_NAME_HINT.test(key)) return 'image';
+  // check color first: a literal "color"/"colour" substring is a more specific signal than
+  // the generic bg_/_bg prefix IMAGE_NAME_HINT also matches (e.g. "bg_color_1", "bg_font_color")
   if (COLOR_NAME_HINT.test(key)) return 'color';
+  if (IMAGE_NAME_HINT.test(key)) return 'image';
   return undefined;
 }
 
