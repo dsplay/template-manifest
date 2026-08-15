@@ -140,15 +140,46 @@ function getHookType(callee, scope) {
   return undefined;
 }
 
+// True when `node` is a call of the shape `JSON.parse(<anything>.getData())` - the manual
+// escape hatch some templates (mostly the bundler-less vanilla-JS ones) use to read the raw
+// DSPLAY payload directly, bypassing `@dsplay/template-utils`'s hooks/global alias entirely.
+function isGetDataCall(node) {
+  if (!node || node.type !== 'CallExpression') return false;
+  const { callee } = node;
+  if (callee.type !== 'MemberExpression' || callee.computed) return false;
+  if (callee.object.type !== 'Identifier' || callee.object.name !== 'JSON') return false;
+  if (callee.property.type !== 'Identifier' || callee.property.name !== 'parse') return false;
+
+  const arg = node.arguments[0];
+  if (!arg || arg.type !== 'CallExpression') return false;
+  if (arg.callee.type !== 'MemberExpression' || arg.callee.computed) return false;
+  return arg.callee.property.type === 'Identifier' && arg.callee.property.name === 'getData';
+}
+
+// True when `node` is an Identifier that (directly, or via one or more local `var x = ...`
+// indirections) refers to the result of a `JSON.parse(<anything>.getData())` call.
+function resolvesToGetDataResult(node, scope, seen = new Set()) {
+  if (!node) return false;
+  if (isGetDataCall(node)) return true;
+  if (node.type === 'Identifier') {
+    if (seen.has(node.name)) return false;
+    const binding = scope.getBinding(node.name);
+    const init = binding?.path?.isVariableDeclarator?.() ? binding.path.node.init : undefined;
+    return init ? resolvesToGetDataResult(init, scope, new Set(seen).add(node.name)) : false;
+  }
+  return false;
+}
+
 // True when `node` is an expression representing "the template variables object" itself -
-// covers the ES default export, the React `useTemplate()` hook result, and the global UMD
-// alias's `.template` property (plus one level of local variable indirection for each).
+// covers the ES default export, the React `useTemplate()` hook result, the global UMD alias's
+// `.template` property, and a manually-parsed `JSON.parse(<...>.getData()).template` (plus one
+// level of local variable indirection for each).
 function isTemplateAccessBase(node, scope, seen = new Set()) {
   if (!node) return false;
 
   if (node.type === 'MemberExpression' && !node.computed && node.property.type === 'Identifier'
       && node.property.name === 'template') {
-    return resolvesToGlobalUtilsAlias(node.object, scope);
+    return resolvesToGlobalUtilsAlias(node.object, scope) || resolvesToGetDataResult(node.object, scope);
   }
 
   if (node.type === 'CallExpression' && node.callee.type === 'Identifier') {
@@ -277,8 +308,9 @@ function scanFile(code, table) {
 /**
  * Statically scans a template's source tree for DSPLAY template-variable reads
  * (`tval`/`useTemplateVal`-style calls, `useTemplate()`/`.template` destructuring or direct
- * property access, in both the ES-import and global-UMD-alias worlds) and returns the
- * discovered `{key, type, default?, subtypeGuess?}` entries.
+ * property access, in the ES-import, global-UMD-alias, and manually-parsed
+ * `JSON.parse(<...>.getData()).template` worlds) and returns the discovered
+ * `{key, type, default?, subtypeGuess?}` entries.
  * @param {string} srcDir - Directory to scan recursively for .js/.jsx files.
  * @returns {Array<{key: string, type: 'string'|'boolean'|'integer'|'float', default?: *, subtypeGuess?: string}>}
  */

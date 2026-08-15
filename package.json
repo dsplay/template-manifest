@@ -1,6 +1,6 @@
 {
   "name": "@dsplay/template-manifest",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Statically scans a DSPLAY HTML template's source for its dsplay_template variables and captures its dsplay-data.js as example preview data, producing template-variables.json + template-example-data.json for the CMS to auto-detect variables and seed default preview values.",
   "type": "module",
   "main": "./core.js",
